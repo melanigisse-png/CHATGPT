@@ -1,9 +1,11 @@
 package mx.iadesign.cometqr;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -34,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 501;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 502;
 
     private WebView webView;
     private GmsBarcodeScanner scanner;
@@ -43,6 +46,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        NotificationReceiver.createChannel(this);
+        requestNotificationPermissionIfNeeded();
+        scheduleDailyChecks();
 
         GmsBarcodeScannerOptions options = new GmsBarcodeScannerOptions.Builder()
                 .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
@@ -72,6 +79,12 @@ public class MainActivity extends Activity {
                         view.evaluateJavascript(syncJs, null);
                     } catch (Exception e) {
                         Toast.makeText(MainActivity.this, "No se pudo cargar el módulo de sincronización.", Toast.LENGTH_LONG).show();
+                    }
+
+                    String check = getIntent().getStringExtra("open_check");
+                    if (check != null && !check.isEmpty()) {
+                        Toast.makeText(MainActivity.this, "Comprobación COMET pendiente: " + check, Toast.LENGTH_LONG).show();
+                        getIntent().removeExtra("open_check");
                     }
                 }
             }
@@ -125,6 +138,18 @@ public class MainActivity extends Activity {
         });
 
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+        }
+    }
+
+    private void scheduleDailyChecks() {
+        NotificationReceiver.schedule(this, 12, 0, 1200, "12:00");
+        NotificationReceiver.schedule(this, 15, 30, 1530, "15:30");
     }
 
     private String readAsset(String name) throws Exception {
