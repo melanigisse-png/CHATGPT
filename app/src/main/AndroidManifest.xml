@@ -6,7 +6,9 @@
 
     <application
         android:allowBackup="true"
-        android:label="COMET QR"
+        android:label="Puesta a Punto COMET"
+        android:icon="@drawable/app_icon"
+        android:roundIcon="@drawable/app_icon"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
 
