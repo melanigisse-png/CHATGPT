@@ -23,6 +23,13 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
 
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 501;
 
@@ -55,6 +62,7 @@ public class MainActivity extends Activity {
 
         webView.setWebViewClient(new WebViewClient());
         webView.addJavascriptInterface(new AndroidQrBridge(), "AndroidQR");
+        webView.addJavascriptInterface(new AndroidSyncBridge(), "AndroidSync");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
@@ -118,6 +126,50 @@ public class MainActivity extends Activity {
                         String msg = e.getMessage() == null ? "No se pudo abrir el lector QR." : e.getMessage();
                         callJs("window.onNativeQrError(" + JSONObject.quote(msg) + ");");
                     }));
+        }
+    }
+
+    public class AndroidSyncBridge {
+        @JavascriptInterface
+        public void send(String requestId, String endpoint, String payload) {
+            new Thread(() -> {
+                HttpURLConnection conn = null;
+                try {
+                    URL url = new URL(endpoint);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setRequestMethod("POST");
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(30000);
+                    conn.setDoOutput(true);
+                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                    conn.setRequestProperty("Accept", "application/json");
+                    byte[] bytes = payload.getBytes(StandardCharsets.UTF_8);
+                    conn.setFixedLengthStreamingMode(bytes.length);
+                    try (OutputStream os = conn.getOutputStream()) {
+                        os.write(bytes);
+                    }
+
+                    int code = conn.getResponseCode();
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(
+                            code >= 200 && code < 400 ? conn.getInputStream() : conn.getErrorStream(),
+                            StandardCharsets.UTF_8));
+                    StringBuilder sb = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) sb.append(line);
+                    reader.close();
+
+                    if (code >= 200 && code < 300) {
+                        callJs("window.onNativeSyncResult(" + JSONObject.quote(requestId) + ",true," + JSONObject.quote(sb.toString()) + ");");
+                    } else {
+                        callJs("window.onNativeSyncResult(" + JSONObject.quote(requestId) + ",false," + JSONObject.quote("HTTP " + code + ": " + sb) + ");");
+                    }
+                } catch (Exception e) {
+                    String msg = e.getMessage() == null ? "Error de red" : e.getMessage();
+                    callJs("window.onNativeSyncResult(" + JSONObject.quote(requestId) + ",false," + JSONObject.quote(msg) + ");");
+                } finally {
+                    if (conn != null) conn.disconnect();
+                }
+            }).start();
         }
     }
 
