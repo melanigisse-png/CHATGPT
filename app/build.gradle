@@ -10,8 +10,8 @@ android {
         applicationId 'mx.iadesign.cometqr'
         minSdk 23
         targetSdk 35
-        versionCode 11
-        versionName '0.9.0'
+        versionCode 12
+        versionName '0.10.0'
     }
 
     buildTypes {
@@ -25,6 +25,23 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+def iconBase64File = file('src/main/icon.b64')
+def generatedIconFile = file('src/main/res/drawable-nodpi/app_icon.jpg')
+
+tasks.register('generateAppIcon') {
+    inputs.file(iconBase64File)
+    outputs.file(generatedIconFile)
+    doLast {
+        generatedIconFile.parentFile.mkdirs()
+        byte[] decoded = java.util.Base64.getMimeDecoder().decode(iconBase64File.text.trim())
+        generatedIconFile.bytes = decoded
+    }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn('generateAppIcon')
 }
 
 dependencies {
