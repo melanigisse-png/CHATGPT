@@ -6,16 +6,23 @@ import android.content.ClipData;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.view.Gravity;
+import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.mlkit.vision.barcode.common.Barcode;
@@ -39,6 +46,7 @@ public class MainActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 502;
 
     private WebView webView;
+    private View splashView;
     private GmsBarcodeScanner scanner;
     private ValueCallback<Uri[]> fileCallback;
     private Uri pendingCameraUri;
@@ -57,8 +65,17 @@ public class MainActivity extends Activity {
                 .build();
         scanner = GmsBarcodeScanning.getClient(this, options);
 
+        FrameLayout root = new FrameLayout(this);
         webView = new WebView(this);
-        setContentView(webView);
+        root.addView(webView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+
+        splashView = buildSplashView();
+        root.addView(splashView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(root);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -76,10 +93,16 @@ public class MainActivity extends Activity {
                 if (url != null && url.contains("android_asset/index.html")) {
                     try {
                         String syncJs = readAsset("sync.js");
-                        view.evaluateJavascript(syncJs, null);
                         String v09Js = readAsset("v09.js");
-                        view.evaluateJavascript(v09Js, value -> openPendingFromIntent());
+                        String v10Js = readAsset("v10.js");
+                        view.evaluateJavascript(syncJs, null);
+                        view.evaluateJavascript(v09Js, null);
+                        view.evaluateJavascript(v10Js, value -> {
+                            openPendingFromIntent();
+                            hideSplash();
+                        });
                     } catch (Exception e) {
+                        hideSplash();
                         Toast.makeText(MainActivity.this, "No se pudieron cargar los módulos de la aplicación.", Toast.LENGTH_LONG).show();
                     }
                 }
@@ -135,6 +158,69 @@ public class MainActivity extends Activity {
         });
 
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    private View buildSplashView() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER);
+        panel.setPadding(dp(28), dp(28), dp(28), dp(28));
+        panel.setBackgroundColor(Color.rgb(248, 243, 234));
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.app_icon);
+        icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(230), dp(230));
+        iconParams.bottomMargin = dp(26);
+        panel.addView(icon, iconParams);
+
+        TextView title = new TextView(this);
+        title.setText("Puesta a Punto COMET");
+        title.setTextColor(Color.rgb(32, 36, 42));
+        title.setTextSize(28);
+        title.setGravity(Gravity.CENTER);
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        panel.addView(title, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView powered = new TextView(this);
+        powered.setText("POWERED BY IVAN AVILES");
+        powered.setTextColor(Color.rgb(184, 87, 16));
+        powered.setTextSize(15);
+        powered.setLetterSpacing(0.12f);
+        powered.setGravity(Gravity.CENTER);
+        powered.setPadding(0, dp(14), 0, 0);
+        powered.setTypeface(powered.getTypeface(), android.graphics.Typeface.BOLD);
+        panel.addView(powered, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView loading = new TextView(this);
+        loading.setText("Inicializando sistema...");
+        loading.setTextColor(Color.rgb(102, 112, 133));
+        loading.setTextSize(13);
+        loading.setGravity(Gravity.CENTER);
+        loading.setPadding(0, dp(18), 0, 0);
+        panel.addView(loading, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        return panel;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void hideSplash() {
+        if (splashView == null) return;
+        splashView.animate().alpha(0f).setDuration(500).withEndAction(() -> {
+            if (splashView != null) {
+                splashView.setVisibility(View.GONE);
+                splashView = null;
+            }
+        }).start();
     }
 
     private void requestNotificationPermissionIfNeeded() {
