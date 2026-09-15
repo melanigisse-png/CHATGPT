@@ -24,6 +24,8 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -60,7 +62,20 @@ public class MainActivity extends Activity {
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (url != null && url.contains("android_asset/index.html")) {
+                    try {
+                        String syncJs = readAsset("sync.js");
+                        view.evaluateJavascript(syncJs, null);
+                    } catch (Exception e) {
+                        Toast.makeText(MainActivity.this, "No se pudo cargar el módulo de sincronización.", Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+        });
         webView.addJavascriptInterface(new AndroidQrBridge(), "AndroidQR");
         webView.addJavascriptInterface(new AndroidSyncBridge(), "AndroidSync");
         webView.setWebChromeClient(new WebChromeClient() {
@@ -110,6 +125,15 @@ public class MainActivity extends Activity {
         });
 
         webView.loadUrl("file:///android_asset/index.html");
+    }
+
+    private String readAsset(String name) throws Exception {
+        try (InputStream in = getAssets().open(name); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);
+            return out.toString(StandardCharsets.UTF_8.name());
+        }
     }
 
     public class AndroidQrBridge {
