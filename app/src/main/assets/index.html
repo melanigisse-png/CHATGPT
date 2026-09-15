@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>COMET QR</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#172033;background:#f4f6f8}*{box-sizing:border-box}body{margin:0}.top{background:#173b63;color:#fff;padding:18px 16px;position:sticky;top:0;z-index:3}.top h1{font-size:20px;margin:0}.top small{opacity:.85}.wrap{max-width:760px;margin:auto;padding:14px}.card{background:#fff;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0001}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:600px){.row{grid-template-columns:1fr}}label{font-weight:700;font-size:13px;display:block;margin:8px 0 5px}input,select,textarea,button{font:inherit;width:100%;padding:12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff}textarea{min-height:80px}.btn{border:0;background:#1769aa;color:#fff;font-weight:800}.btn.secondary{background:#4b5563}.btn.good{background:#138a52}.btn.bad{background:#b42318}.btn:disabled{opacity:.45}.pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800}.ok{background:#d8f6e7;color:#087443}.ng{background:#fee4e2;color:#a61b13}.na{background:#e7edf3;color:#445}.muted{color:#667085}.hidden{display:none!important}.station{font-weight:900;color:#173b63}.item{border:1px solid #dbe2ea;border-radius:12px;padding:13px;margin:10px 0}.item h3{margin:0 0 8px;font-size:15px}.item .desc{font-size:13px;color:#475467;margin-bottom:10px}.result{margin-top:8px}.err{background:#fff1f0;border:1px solid #fecdca;color:#912018;padding:10px;border-radius:10px;margin:9px 0}.info{background:#eff8ff;border:1px solid #b2ddff;color:#175cd3;padding:10px;border-radius:10px;margin:9px 0}.progress{height:9px;background:#dfe5ec;border-radius:99px;overflow:hidden}.progress>div{height:100%;background:#1769aa}.sig{border:1px dashed #98a2b3;border-radius:10px;padding:12px}.small{font-size:12px}.history-row{border-top:1px solid #e4e7ec;padding:10px 0}.tabs{display:flex;gap:8px}.tabs button{width:auto;flex:1}code{background:#f2f4f7;padding:2px 5px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="top"><h1>Puesta a Punto COMET · QR</h1><small>V0.5.1 Android · recorrido guiado</small></div>
+<div class="wrap">
+<section id="setup" class="card">
+<h2>Iniciar puesta a punto</h2>
+<div class="row"><div><label>Máquina</label><select id="machine"><option value="01">COMET 1</option><option value="02">COMET 2</option><option value="03">COMET 3</option></select></div><div><label>Turno</label><select id="shift"><option>1</option><option>2</option><option>3</option></select></div></div>
+<label>Operador / colaborador</label><select id="operator"><option value="">Seleccionar...</option><option data-id="PT0194">Édgar Chavarria Rios</option><option data-id="PT 2033">Daniel Ocampo Pérez</option><option data-id="PT1942">Roberto Carlos Villalobos Cabello</option></select>
+<div class="row"><div><label>No. empleado</label><input id="emp" readonly></div><div><label>Tipo de material</label><select id="material"><option value="">Seleccionar...</option><option>ABS</option><option>ACRILICO</option><option>TPU</option></select></div></div>
+<label>Supervisora / supervisor</label><input id="supervisor" value="ALMA VILLA">
+<button class="btn" id="startBtn">INICIAR PUESTA A PUNTO</button>
+<div class="tabs" style="margin-top:10px"><button class="btn secondary" id="historyBtn">Historial</button><button class="btn secondary" id="exportBtn">Exportar JSON</button></div>
+</section>
+<section id="run" class="hidden">
+<div class="card"><div class="progress"><div id="bar" style="width:0"></div></div><p id="runMeta" class="small muted"></p><h2 id="stepTitle"></h2><div id="qrBox" class="info"></div><button id="scanBtn" class="btn">ESCANEAR CÓDIGO QR</button><button id="simBtn" class="btn secondary" style="margin-top:8px">Simular QR correcto</button><div id="scanMsg"></div></div>
+<div id="items" class="card hidden"></div>
+<div id="nav" class="card hidden"><button id="continueBtn" class="btn good">COMPLETAR ESTACIÓN</button><button id="cancelBtn" class="btn bad" style="margin-top:8px">Cancelar recorrido</button></div>
+</section>
+<section id="finish" class="card hidden"></section>
+<section id="history" class="card hidden"><h2>Historial local</h2><div id="historyList"></div><button class="btn secondary" id="backHome">Volver</button></section>
+</div>
+<script>
+const OPERATORS={"Édgar Chavarria Rios":"PT0194","Daniel Ocampo Pérez":"PT 2033","Roberto Carlos Villalobos Cabello":"PT1942"};
+const steps=[
+ {tag:'01',title:'TAG/QR-01 · Neumática posterior / tanque',pts:['1.1','1.2','1.3','1.7']},
+ {tag:'02',title:'TAG/QR-02 · Lubricación, bastidores y guías',pts:['1.4','1.5','1.6']},
+ {tag:'04',title:'TAG/QR-04 · Aceite equipo de vacío (antes de encender)',pts:['1.8']},
+ {tag:'03',title:'TAG/QR-03 · Tablero eléctrico',pts:['2.1','2.2']},
+ {tag:'04',title:'TAG/QR-04 · Vacío y presiones auxiliares',pts:['2.3','2.5','2.6']},
+ {tag:'05',title:'TAG/QR-05 · Platinas, resistencias y programa',pts:['2.8','2.9','3.1']}
+];
+const defs={
+ '1.1':{t:'Abrir llaves de paso al tanque de aire',d:'Contrario a manecillas del reloj.',kind:'bool'},
+ '1.2':{t:'Abrir llaves de paso del tanque a la termoformadora',d:'Contrario a manecillas del reloj.',kind:'bool'},
+ '1.3':{t:'Revisar presión del tanque de aire',d:'Rango aceptable: 60 a 80 PSI.',kind:'num',unit:'PSI',min:60,max:80},
+ '1.4':{t:'Revisar nivel del lubricador',d:'Registrar nivel observado.',kind:'level',opts:[['Máximo','OK'],['Medio','OK'],['Mínimo','OK']]},
+ '1.5':{t:'Revisar película de grasa en engranaje de bastidores',d:'Debe existir película de grasa.',kind:'bool'},
+ '1.6':{t:'Revisar puntos de lubricación en guías de platina',d:'Lubricación presente, sin exceso de grasa.',kind:'bool'},
+ '1.7':{t:'Revisar fugas en sistema neumático',d:'Sin fugas = OK.',kind:'leak'},
+ '1.8':{t:'Revisar nivel de aceite del equipo de vacío',d:'El mínimo aún es operable. Debajo del mínimo = NG.',kind:'level',opts:[['Debajo del mínimo','NG'],['En el mínimo','OK'],['Entre mínimo y máximo','OK'],['En el máximo','OK'],['Sobre el máximo','NG']]},
+ '2.1':{t:'Energizar tablero de potencia',d:'Solo aplica a COMET 1.',kind:'bool',comet1:true},
+ '2.2':{t:'Energizar tablero de control',d:'Control encendido.',kind:'bool'},
+ '2.3':{t:'Encender equipo de vacío y verificar presión',d:'Rango aceptable: 20 a 30 inHg. Foto obligatoria.',kind:'num',unit:'inHg',min:20,max:30,photo:true},
+ '2.5':{t:'Encender / verificar centro de carga de aire',d:'Confirmar condición correcta.',kind:'bool'},
+ '2.6':{t:'Verificar presión de aire del lente visor de temperatura',d:'5 PSI exactos = OK. Cualquier otro valor = NG. Foto obligatoria.',kind:'exact',unit:'PSI',exact:5,photo:true},
+ '2.8':{t:'Verificar posición de platinas',d:'Abiertas hasta el tope.',kind:'bool'},
+ '2.9':{t:'Verificar encendido de resistencias',d:'Iniciar operación a temperatura de acuerdo al programa.',kind:'bool'},
+ '3.1':{t:'Verificar programa y confirmar parámetros de termoformado',d:'Programa y parámetros correctos.',kind:'bool'}
+};
+let state=null;
+const $=id=>document.getElementById(id);
+$('operator').onchange=e=>$('emp').value=OPERATORS[e.target.value]||'';
+function expectedQR(){return `COMET-${state.machine}-QR-${steps[state.step].tag}`}
+function saveActive(){localStorage.setItem('cometqr_active',JSON.stringify(state))}
+function loadHistory(){return JSON.parse(localStorage.getItem('cometqr_history')||'[]')}
+function setHistory(h){localStorage.setItem('cometqr_history',JSON.stringify(h))}
+$('startBtn').onclick=()=>{const op=$('operator').value,mat=$('material').value;if(!op||!mat){alert('Selecciona operador y material.');return} state={id:'C'+Date.now(),machine:$('machine').value,shift:$('shift').value,operator:op,employee:$('emp').value,material:mat,supervisor:$('supervisor').value.trim()||'ALMA VILLA',started:new Date().toISOString(),step:0,scanned:false,answers:{},events:[],status:'EN CURSO'}; saveActive(); $('setup').classList.add('hidden');$('run').classList.remove('hidden');renderStep()};
+function renderStep(){const s=steps[state.step];$('bar').style.width=Math.round(state.step/steps.length*100)+'%';$('runMeta').textContent=`COMET ${Number(state.machine)} · ${state.operator} · ${state.material}`;$('stepTitle').textContent=`Paso ${state.step+1} de ${steps.length}: ${s.title}`;$('qrBox').innerHTML=`Escanea <b>${expectedQR()}</b> para habilitar esta estación.`;$('scanMsg').innerHTML='';$('items').classList.add('hidden');$('nav').classList.add('hidden');state.scanned=false;saveActive()}
+$('scanBtn').onclick=()=>{if(window.AndroidQR&&typeof window.AndroidQR.scan==='function'){window.AndroidQR.scan()}else{alert('Esta función necesita la aplicación Android.')}};
+$('simBtn').onclick=()=>handleQr(expectedQR());
+window.onNativeQrResult=v=>handleQr(v);
+window.onNativeQrError=m=>$('scanMsg').innerHTML=`<div class="err">${esc(m)}</div>`;
+function handleQr(v){v=(v||'').trim();if(v!==expectedQR()){$('scanMsg').innerHTML=`<div class="err">QR incorrecto: <code>${esc(v)}</code><br>Se esperaba <code>${expectedQR()}</code>.</div>`;return}state.scanned=true;state.events.push({type:'QR',value:v,time:new Date().toISOString(),step:state.step});saveActive();$('scanMsg').innerHTML=`<div class="info">✓ QR correcto: <code>${v}</code></div>`;renderItems()}
+function renderItems(){const holder=$('items');holder.innerHTML=`<h2 class="station">Inspección</h2>`;for(const p of steps[state.step].pts){const d=defs[p];const na=d.comet1&&state.machine!=='01';const box=document.createElement('div');box.className='item';box.dataset.p=p;box.innerHTML=`<h3>${p} · ${d.t}</h3><div class="desc">${d.d}</div>${na?'<span class="pill na">N/A automático</span>':controlHtml(p,d)}<div class="result" id="res-${p}"></div>${!na?`<label class="obsLabel hidden" id="obsL-${p}">Observación obligatoria para NG</label><textarea class="hidden" id="obs-${p}" placeholder="Describe la condición y/o corrección"></textarea>`:''}`;holder.appendChild(box);if(na){state.answers[p]={result:'N/A',value:'No aplica por máquina',time:new Date().toISOString()};}else bindPoint(p,d)}holder.classList.remove('hidden');$('nav').classList.remove('hidden');saveActive()}
+function controlHtml(p,d){if(d.kind==='bool')return `<select id="v-${p}"><option value="">Seleccionar...</option><option value="OK">OK</option><option value="NG">NG</option></select>`;if(d.kind==='leak')return `<select id="v-${p}"><option value="">Seleccionar...</option><option value="OK">Sin fuga</option><option value="NG">Con fuga</option></select>`;if(d.kind==='level')return `<select id="v-${p}"><option value="">Seleccionar...</option>${d.opts.map((o,i)=>`<option value="${i}">${o[0]}</option>`).join('')}</select>`;if(d.kind==='num'||d.kind==='exact')return `<div class="row"><input id="v-${p}" type="number" step="0.1" inputmode="decimal" placeholder="Valor"><input value="${d.unit}" disabled></div>${d.photo?`<label>Evidencia fotográfica obligatoria</label><input id="ph-${p}" type="file" accept="image/*" capture="environment"><div id="phn-${p}" class="small muted"></div>`:''}`;return ''}
+function bindPoint(p,d){const el=$('v-'+p);el.onchange=()=>evaluate(p,d);if(d.photo){$('ph-'+p).onchange=e=>{const f=e.target.files&&e.target.files[0];$('phn-'+p).textContent=f?`Foto seleccionada: ${f.name}`:'';evaluate(p,d)}}}
+function evaluate(p,d){const el=$('v-'+p);let result='',value='';if(d.kind==='bool'||d.kind==='leak'){value=el.value;result=el.value}else if(d.kind==='level'){if(el.value==='')return;const o=d.opts[Number(el.value)];value=o[0];result=o[1]}else{if(el.value==='')return;const n=Number(el.value);value=n;if(d.kind==='num')result=(n>=d.min&&n<=d.max)?'OK':'NG';else result=(n===d.exact)?'OK':'NG'}const obs=$('obs-'+p);if(obs){obs.classList.toggle('hidden',result!=='NG');$('obsL-'+p).classList.toggle('hidden',result!=='NG')}const r=$('res-'+p);r.innerHTML=result?`<span class="pill ${result==='OK'?'ok':'ng'}">${result}</span>`:'';state.answers[p]={result,value,time:new Date().toISOString(),photo:d.photo?!!($('ph-'+p).files&&$('ph-'+p).files[0]):false};saveActive()}
+$('continueBtn').onclick=()=>{const pts=steps[state.step].pts;for(const p of pts){const d=defs[p],a=state.answers[p];if(d.comet1&&state.machine!=='01')continue;if(!a||!a.result){alert(`Falta responder ${p}.`);return}if(d.photo&&!a.photo){alert(`La foto es obligatoria en ${p}.`);return}if(a.result==='NG'){const obs=$('obs-'+p);if(!obs||!obs.value.trim()){alert(`Escribe la observación de ${p}.`);return}a.observation=obs.value.trim();alert(`${p} está en NG. Corrige la condición y vuelve a capturar un resultado OK antes de avanzar.`);return}}
+ state.step++;if(state.step<steps.length){renderStep()}else finishRun()};
+$('cancelBtn').onclick=()=>{if(confirm('¿Cancelar este recorrido?')){state.status='CANCELADO';state.finished=new Date().toISOString();archive();home()}};
+function finishRun(){state.status='LISTO PARA FIRMA';saveActive();$('run').classList.add('hidden');const f=$('finish');f.classList.remove('hidden');f.innerHTML=`<h2>✓ Inspección completa</h2><p>Todos los puntos requeridos quedaron conformes.</p><div class="sig"><label>Firma del colaborador</label><input id="signature" placeholder="Escribe tu nombre como firma" value="${esc(state.operator)}"></div><button class="btn good" id="release">FIRMAR Y LIBERAR</button>`;$('release').onclick=()=>{const sig=$('signature').value.trim();if(!sig){alert('Captura la firma.');return}state.signature=sig;state.status='LIBERADA';state.finished=new Date().toISOString();state.followups=[{time:'12:00',status:'PENDIENTE'},{time:'15:30',status:'PENDIENTE'}];archive();f.innerHTML=`<h2>✓ MÁQUINA LIBERADA</h2><p>COMET ${Number(state.machine)} · ${esc(state.operator)}</p><p class="muted">Seguimiento pendiente: presión 60–80 PSI a las 12:00 y 15:30.</p><button class="btn" onclick="home()">Nueva puesta a punto</button>`}}
+function archive(){const h=loadHistory();h.unshift(state);setHistory(h);localStorage.removeItem('cometqr_active')}
+function home(){$('run').classList.add('hidden');$('finish').classList.add('hidden');$('history').classList.add('hidden');$('setup').classList.remove('hidden');state=null}
+$('historyBtn').onclick=()=>{const h=loadHistory();$('setup').classList.add('hidden');$('history').classList.remove('hidden');$('historyList').innerHTML=h.length?h.map(x=>`<div class="history-row"><b>${x.status}</b> · COMET ${Number(x.machine)}<br><span class="small">${esc(x.operator)} · ${esc(x.material)} · ${new Date(x.started).toLocaleString()}</span></div>`).join(''):'<p class="muted">Sin registros.</p>'};$('backHome').onclick=home;
+$('exportBtn').onclick=()=>{const data=JSON.stringify(loadHistory(),null,2);const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='COMET_QR_historial.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+</script>
+</body></html>
