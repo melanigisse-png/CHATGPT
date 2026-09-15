@@ -10,8 +10,8 @@ android {
         applicationId 'mx.iadesign.cometqr'
         minSdk 23
         targetSdk 35
-        versionCode 12
-        versionName '0.10.0'
+        versionCode 13
+        versionName '0.10.1'
     }
 
     buildTypes {
@@ -28,7 +28,7 @@ android {
 }
 
 def iconBase64File = file('src/main/icon.b64')
-def generatedIconFile = file('src/main/res/drawable-nodpi/app_icon.jpg')
+def generatedIconFile = file('src/main/res/drawable-nodpi/app_icon.webp')
 
 tasks.register('generateAppIcon') {
     inputs.file(iconBase64File)
