@@ -10,6 +10,8 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.view.Gravity;
 import android.view.View;
@@ -44,9 +46,11 @@ import java.nio.charset.StandardCharsets;
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 501;
     private static final int NOTIFICATION_PERMISSION_REQUEST = 502;
+    private static final long MIN_SPLASH_MS = 1500L;
 
     private WebView webView;
     private View splashView;
+    private long splashShownAt = 0L;
     private GmsBarcodeScanner scanner;
     private ValueCallback<Uri[]> fileCallback;
     private Uri pendingCameraUri;
@@ -71,6 +75,7 @@ public class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
+        splashShownAt = System.currentTimeMillis();
         splashView = buildSplashView();
         root.addView(splashView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -215,7 +220,14 @@ public class MainActivity extends Activity {
 
     private void hideSplash() {
         if (splashView == null) return;
-        splashView.animate().alpha(0f).setDuration(500).withEndAction(() -> {
+        long elapsed = System.currentTimeMillis() - splashShownAt;
+        long remaining = Math.max(0L, MIN_SPLASH_MS - elapsed);
+        new Handler(Looper.getMainLooper()).postDelayed(this::fadeSplash, remaining);
+    }
+
+    private void fadeSplash() {
+        if (splashView == null) return;
+        splashView.animate().alpha(0f).setDuration(350).withEndAction(() -> {
             if (splashView != null) {
                 splashView.setVisibility(View.GONE);
                 splashView = null;
