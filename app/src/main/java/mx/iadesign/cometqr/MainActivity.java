@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
 
         NotificationReceiver.createChannel(this);
         requestNotificationPermissionIfNeeded();
-        scheduleDailyChecks();
+        scheduleChecks("12:00", "15:30");
 
         GmsBarcodeScannerOptions options = new GmsBarcodeScannerOptions.Builder()
                 .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
@@ -77,20 +77,17 @@ public class MainActivity extends Activity {
                     try {
                         String syncJs = readAsset("sync.js");
                         view.evaluateJavascript(syncJs, null);
+                        String v09Js = readAsset("v09.js");
+                        view.evaluateJavascript(v09Js, value -> openPendingFromIntent());
                     } catch (Exception e) {
-                        Toast.makeText(MainActivity.this, "No se pudo cargar el módulo de sincronización.", Toast.LENGTH_LONG).show();
-                    }
-
-                    String check = getIntent().getStringExtra("open_check");
-                    if (check != null && !check.isEmpty()) {
-                        Toast.makeText(MainActivity.this, "Comprobación COMET pendiente: " + check, Toast.LENGTH_LONG).show();
-                        getIntent().removeExtra("open_check");
+                        Toast.makeText(MainActivity.this, "No se pudieron cargar los módulos de la aplicación.", Toast.LENGTH_LONG).show();
                     }
                 }
             }
         });
         webView.addJavascriptInterface(new AndroidQrBridge(), "AndroidQR");
         webView.addJavascriptInterface(new AndroidSyncBridge(), "AndroidSync");
+        webView.addJavascriptInterface(new AndroidReminderBridge(), "AndroidReminder");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
@@ -147,9 +144,36 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void scheduleDailyChecks() {
-        NotificationReceiver.schedule(this, 12, 0, 1200, "12:00");
-        NotificationReceiver.schedule(this, 15, 30, 1530, "15:30");
+    private int[] parseTime(String value, int defaultHour, int defaultMinute) {
+        try {
+            String[] parts = value.split(":");
+            return new int[]{Integer.parseInt(parts[0]), Integer.parseInt(parts[1])};
+        } catch (Exception e) {
+            return new int[]{defaultHour, defaultMinute};
+        }
+    }
+
+    private void scheduleChecks(String first, String second) {
+        int[] t1 = parseTime(first, 12, 0);
+        int[] t2 = parseTime(second, 15, 30);
+        NotificationReceiver.schedule(this, t1[0], t1[1], 1200, first);
+        NotificationReceiver.schedule(this, t2[0], t2[1], 1530, second);
+    }
+
+    private void openPendingFromIntent() {
+        if (webView == null) return;
+        String check = getIntent().getStringExtra("open_check");
+        if (check != null && !check.isEmpty()) {
+            callJs("if(window.openPendingChecks){window.openPendingChecks(" + JSONObject.quote(check) + ");}");
+            getIntent().removeExtra("open_check");
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        openPendingFromIntent();
     }
 
     private String readAsset(String name) throws Exception {
@@ -158,6 +182,13 @@ public class MainActivity extends Activity {
             int n;
             while ((n = in.read(buffer)) >= 0) out.write(buffer, 0, n);
             return out.toString(StandardCharsets.UTF_8.name());
+        }
+    }
+
+    public class AndroidReminderBridge {
+        @JavascriptInterface
+        public void configure(String first, String second) {
+            runOnUiThread(() -> scheduleChecks(first, second));
         }
     }
 
