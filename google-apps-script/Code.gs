@@ -2,15 +2,22 @@ const SPREADSHEET_ID = '1hsxevRPuQyM0Y9fpgoqoWeyFQtIttWCA7IYliu5Hl08';
 const EVIDENCE_FOLDER_NAME = 'COMET_EVIDENCIAS';
 
 function doGet() {
-  return json_({ok:true, service:'COMET QR V0.8', spreadsheetId:SPREADSHEET_ID});
+  return json_({ok:true, service:'COMET QR V0.9', spreadsheetId:SPREADSHEET_ID});
 }
 
 function doPost(e) {
   try {
     const data = JSON.parse((e.postData && e.postData.contents) || '{}');
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    if (String(data.type || '').toUpperCase() === 'FOLLOWUP') {
+      appendFollowup_(ss.getSheetByName('COMPROBACIONES'), data.followup || {});
+      SpreadsheetApp.flush();
+      return json_({ok:true, type:'FOLLOWUP'});
+    }
+
     if (!data.execution || !data.execution.id) throw new Error('Payload sin execution.id');
 
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const exec = data.execution;
     const summary = ss.getSheetByName('RESUMEN_COMPACTO');
     if (!summary) throw new Error('No existe RESUMEN_COMPACTO');
@@ -32,6 +39,24 @@ function doPost(e) {
   } catch (err) {
     return json_({ok:false, error:String(err && err.stack ? err.stack : err)});
   }
+}
+
+function appendFollowup_(sheet, f) {
+  if (!sheet) throw new Error('No existe COMPROBACIONES');
+  if (!f.executionId) throw new Error('Comprobación sin ID_EJECUCION');
+  const actual = f.actualAt ? new Date(f.actualAt) : new Date();
+  appendByHeaders_(sheet, {
+    FECHA_HORA: actual,
+    MAQUINA: f.machine || '',
+    HORA_PROGRAMADA: f.scheduledTime || '',
+    HORA_REAL: actual,
+    RETRASO_MIN: Number(f.delayMin || 0),
+    OPERADOR: f.operator || '',
+    RESULTADO: f.result || '',
+    OBSERVACION: f.observation || '',
+    ID_EJECUCION: f.executionId,
+    SINCRONIZADO: 'SI'
+  });
 }
 
 function executionExists_(sheet, id) {
