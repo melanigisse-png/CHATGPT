@@ -46,7 +46,7 @@ import java.nio.charset.StandardCharsets;
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 501;
     private static final int NOTIFICATION_PERMISSION_REQUEST = 502;
-    private static final long MIN_SPLASH_MS = 1500L;
+    private static final long MIN_SPLASH_MS = 2000L;
 
     private WebView webView;
     private View splashView;
@@ -100,9 +100,11 @@ public class MainActivity extends Activity {
                         String syncJs = readAsset("sync.js");
                         String v09Js = readAsset("v09.js");
                         String v10Js = readAsset("v10.js");
+                        String v11Js = readAsset("v11.js");
                         view.evaluateJavascript(syncJs, null);
                         view.evaluateJavascript(v09Js, null);
-                        view.evaluateJavascript(v10Js, value -> {
+                        view.evaluateJavascript(v10Js, null);
+                        view.evaluateJavascript(v11Js, value -> {
                             openPendingFromIntent();
                             hideSplash();
                         });
