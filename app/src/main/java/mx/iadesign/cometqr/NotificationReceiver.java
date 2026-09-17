@@ -1,18 +1,22 @@
 package mx.iadesign.cometqr;
 
 import android.app.AlarmManager;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 
 import java.util.Calendar;
 
 public class NotificationReceiver extends BroadcastReceiver {
-    public static final String CHANNEL_ID = "comet_checks";
+    public static final String CHANNEL_ID = "comet_checks_v2";
     public static final String EXTRA_HOUR = "hour";
     public static final String EXTRA_MINUTE = "minute";
     public static final String EXTRA_LABEL = "label";
@@ -47,24 +51,38 @@ public class NotificationReceiver extends BroadcastReceiver {
                 .setContentText("Realiza la comprobación programada de las " + label + ".")
                 .setAutoCancel(true)
                 .setContentIntent(contentIntent)
-                .setPriority(android.app.Notification.PRIORITY_HIGH);
+                .setPriority(android.app.Notification.PRIORITY_HIGH)
+                .setCategory(Notification.CATEGORY_REMINDER);
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            builder.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION));
+            builder.setDefaults(Notification.DEFAULT_SOUND | Notification.DEFAULT_VIBRATE);
+        }
 
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         nm.notify(requestCode, builder.build());
 
-        // Programar la siguiente del mismo horario para el día siguiente.
         schedule(context, hour, minute, requestCode, label);
     }
 
     public static void createChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            AudioAttributes attrs = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build();
+
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Comprobaciones COMET",
+                    "Comprobaciones COMET con sonido",
                     NotificationManager.IMPORTANCE_HIGH
             );
-            channel.setDescription("Recordatorios de comprobación de puesta a punto COMET");
+            channel.setDescription("Recordatorios audibles de comprobación de puesta a punto COMET");
             channel.enableVibration(true);
+            channel.setVibrationPattern(new long[]{0, 250, 150, 250});
+            channel.setSound(sound, attrs);
+
             NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             nm.createNotificationChannel(channel);
         }
