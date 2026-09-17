@@ -2,7 +2,7 @@ const SPREADSHEET_ID = '1hsxevRPuQyM0Y9fpgoqoWeyFQtIttWCA7IYliu5Hl08';
 const EVIDENCE_FOLDER_NAME = 'COMET_EVIDENCIAS';
 
 function doGet() {
-  return json_({ok:true, service:'COMET QR V0.9', spreadsheetId:SPREADSHEET_ID});
+  return json_({ok:true, service:'COMET QR V0.11', spreadsheetId:SPREADSHEET_ID});
 }
 
 function doPost(e) {
@@ -34,8 +34,13 @@ function doPost(e) {
     appendFinalDetail_(ss.getSheetByName('DETALLE_FINAL_PUNTOS'), finalDetail, exec, evidenceUrls);
     appendRealIncidents_(ss.getSheetByName('INCIDENCIAS_REALES'), realIncidents, exec, evidenceUrls);
 
+    let whatsapp = {requested:false, sent:false};
+    if (data.supervisorAlert && String(data.supervisorAlert.channel || '').toUpperCase() === 'WHATSAPP') {
+      whatsapp = sendSupervisorWhatsApp_(data.supervisorAlert);
+    }
+
     SpreadsheetApp.flush();
-    return json_({ok:true, executionId:exec.id, evidence:evidenceUrls});
+    return json_({ok:true, executionId:exec.id, evidence:evidenceUrls, whatsapp:whatsapp});
   } catch (err) {
     return json_({ok:false, error:String(err && err.stack ? err.stack : err)});
   }
@@ -131,6 +136,58 @@ function appendRealIncidents_(sheet, rows, exec, evidenceUrls) {
     EVIDENCIA_URL:evidenceUrls[r.point] || '',
     ID_EJECUCION:exec.id
   }));
+}
+
+function sendSupervisorWhatsApp_(alertData) {
+  const props = PropertiesService.getScriptProperties();
+  const token = props.getProperty('WHATSAPP_TOKEN') || '';
+  const phoneNumberId = props.getProperty('WHATSAPP_PHONE_NUMBER_ID') || '';
+  const graphVersion = props.getProperty('WHATSAPP_GRAPH_VERSION') || 'v23.0';
+  const templateName = props.getProperty('WHATSAPP_TEMPLATE_NAME') || '';
+  const languageCode = props.getProperty('WHATSAPP_TEMPLATE_LANGUAGE') || 'es_MX';
+
+  if (!token || !phoneNumberId) {
+    return {requested:true, sent:false, error:'WHATSAPP_NOT_CONFIGURED'};
+  }
+
+  let to = String(alertData.phone || '').replace(/\D/g, '');
+  if (to.length === 10) to = '52' + to;
+  if (!to) return {requested:true, sent:false, error:'WHATSAPP_PHONE_EMPTY'};
+
+  const message = String(alertData.message || 'Alerta de puesta a punto COMET');
+  let body;
+  if (templateName) {
+    body = {
+      messaging_product:'whatsapp',
+      to:to,
+      type:'template',
+      template:{
+        name:templateName,
+        language:{code:languageCode},
+        components:[{type:'body', parameters:[{type:'text', text:message}]}]
+      }
+    };
+  } else {
+    body = {
+      messaging_product:'whatsapp',
+      recipient_type:'individual',
+      to:to,
+      type:'text',
+      text:{preview_url:false, body:message}
+    };
+  }
+
+  const url = 'https://graph.facebook.com/' + graphVersion + '/' + encodeURIComponent(phoneNumberId) + '/messages';
+  const res = UrlFetchApp.fetch(url, {
+    method:'post',
+    contentType:'application/json',
+    headers:{Authorization:'Bearer ' + token},
+    payload:JSON.stringify(body),
+    muteHttpExceptions:true
+  });
+  const code = res.getResponseCode();
+  const text = res.getContentText();
+  return {requested:true, sent:code >= 200 && code < 300, httpCode:code, response:text.slice(0,500)};
 }
 
 function appendByHeaders_(sheet, obj) {
